@@ -2,7 +2,7 @@ package org.springboot;
 
 import javax.annotation.PreDestroy;
 import org.springboot.batch.JobFactory;
-import org.springboot.config.ShutdownManager;
+import org.springboot.config.ShutdownBatchHook;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
@@ -42,9 +42,8 @@ public class SpringBatchCsvApplication implements CommandLineRunner {
 		log.info("STARTING THE APPLICATION");
 		applicationContext = SpringApplication.run(SpringBatchCsvApplication.class, args);
 		log.info("APPLICATION FINISHED");
-		ShutdownManager sm = new ShutdownManager();
-		sm.setAppContext(applicationContext);
-		sm.initiateShutdown(0);
+		ShutdownBatchHook.get().setApplicationContext(applicationContext);
+		ShutdownBatchHook.get().waitForAllBatches(0);
 	}
 
 	@PreDestroy
@@ -54,7 +53,7 @@ public class SpringBatchCsvApplication implements CommandLineRunner {
 
 	@Override
 	public void run(String... args) throws JobExecutionAlreadyRunningException, JobRestartException,
-			JobInstanceAlreadyCompleteException, JobParametersInvalidException {
+			JobInstanceAlreadyCompleteException, JobParametersInvalidException, InterruptedException {
 
 		log.info("EXECUTING : command line runner");
 		Job job = jobFactory.csvFileToDatabaseJob();
@@ -62,6 +61,7 @@ public class SpringBatchCsvApplication implements CommandLineRunner {
 		JobExecution res = jobLauncher.run(job, jobParameters);
 		log.info("{}", job.getName());
 		log.info("{}", res.getJobId());
+		ShutdownBatchHook.get().upsertJob(res.getJobId(), res.getStatus());
 	}
 
 }
